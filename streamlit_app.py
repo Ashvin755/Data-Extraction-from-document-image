@@ -9,10 +9,10 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ServerError
 
-prompt = """
+PROMPT =  """
 You are an expert document processing AI. Analyze the provided image of a transport consignment note/invoice. Your task is to extract specific target fields and return them in a structured JSON format. 
 
-Follow these strict visual processing rules to handle handwritten text spans, overflow characters, and multi-line values:
+Follow these strict visual processing rules to handle mixed handwriting, printing, and overlapping stamps:
 
 ### 1. FIELD EXTRACTION RULES:
 - **invoice_number**: 
@@ -24,27 +24,21 @@ Follow these strict visual processing rules to handle handwritten text spans, ov
 - **invoice_value**:
     * Look for the box explicitly labeled "INVOICE VALUE". 
     * Extract the total monetary valuation of the goods listed in this box.
-    * Ignore trailing currency designators, formatting lines, or suffix dashes (such as "/-" or "—"). Extract only the core numerical amount.
-    * Convert the final value to a clean decimal string format (e.g., "108336"). Do not include currency symbols (Rs, $).
+    * If the document is handwritten, ignore trailing currency designators, formatting lines, or suffix dashes (such as "/-" or "—"). Extract only the core numerical amount.
+    * Convert the final value to a clean decimal string format (e.g., "8939.76" or "108336"). Do not include currency symbols (Rs, $).
 
 - **date**: 
     * Look for the field explicitly labeled "DATE & TIME" or "BOOKING DATE & TIME". Extract only the date portion in a clean format (e.g., DD/MM/YY or DD-MMM-YYYY).
     * CRITICAL: Do NOT extract the "EXPECTED DELIVERY DATE". Always prioritize the actual booking/creation date.
 
 - **consignor**: 
-    * Look specifically for the large rectangular block labeled "CONSIGNOR:".
-    * Read the handwriting inside this block thoroughly. Do not stop at the first word.
-    * Capture the full name written across the space (e.g., "Pidilite Industries Ltd"). Include all words and suffixes (like "Ltd" or "Limited").
-    * Extract the full company name and addres listed under the "CONSIGNOR" .
+    * Extract the full company name and shipping address listed under the "CONSIGNOR" or "FROM" label. Clean up any trailing text or address details if they bleed across lines.
 
 - **consignee**: 
-    * Look specifically for the large rectangular block labeled "CONSIGNEE:(SHIPPED TO)".
-    * This text is heavily handwritten and can be long. Read the entire span within this region carefully.
-    * Capture the complete multi-line company name or name entry entirely (e.g., "Pidilite Industries Ltd").
-    * Extract the full company name and shipping address listed under the "CONSIGNEE (SHIPPED TO)" label.
+    * Extract the full company name and shipping address listed under the "CONSIGNEE (SHIPPED TO)" or "TO" label.
 
 - **is_sealed**: 
-    * Scan the document for an official inked corporate/security stamp or verification seal (such as a round purple or blue stamp). 
+    * Scan the document for an official inked corporate/security stamp or verification seal (such as the purple "WELLSUN TEXCHEM PVT LTD" or "ACE REALTORS" stamps). 
     * Return `true` if a physical ink stamp is visible anywhere on the document, otherwise return `false`.
 
 - **document_type**:
