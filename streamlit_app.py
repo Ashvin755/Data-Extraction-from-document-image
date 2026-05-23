@@ -32,7 +32,7 @@ Follow these strict visual processing rules to handle mixed handwriting, printin
     * CRITICAL: Do NOT extract the "EXPECTED DELIVERY DATE". Always prioritize the actual booking/creation date.
 
 - **consignor**: 
-    * Extract the full company name and shipping address listed under the "CONSIGNOR" or "FROM" label. Clean up any trailing text or address details if they bleed across lines.
+    * Extract the full company name and shipping address listed under the "CONSIGNOR" . Clean up any trailing text or address details if they bleed across lines.
 
 - **consignee**: 
     * Extract the full company name and shipping address listed under the "CONSIGNEE (SHIPPED TO)" or "TO" label.
