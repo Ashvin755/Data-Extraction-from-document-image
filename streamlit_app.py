@@ -9,36 +9,45 @@ from google import genai
 from google.genai import types
 from google.genai.errors import ServerError
 
-PROMPT =  """
-You are an expert document processing AI. Analyze the provided image of a transport consignment note/invoice. Your task is to extract specific target fields and return them in a structured JSON format. 
+PROMPT = """
+You are an expert document processing AI with advanced spatial reasoning. Analyze the provided image of a transport consignment note/invoice. 
 
-Follow these strict visual processing rules to handle mixed handwriting, printing, and overlapping stamps:
+### STEP 1: ORIENTATION CORRECTION (CRITICAL)
+- Examine the layout, text direction, logos, and printed boundaries of the document.
+- Detect if the image is rotated (90 degrees counterclockwise, 90 degrees clockwise, 180 degrees upside down, or tilted).
+- Visually and mentally correct the orientation so that the headers (like "V-TRANS") are at the top and the text reads normally from left to right, top to bottom.
+- Map your bounding box coordinates and reading vectors to this corrected upright orientation before extracting any data.
 
-### 1. FIELD EXTRACTION RULES:
+### STEP 2: FIELD EXTRACTION RULES
+Extract the following fields based on the corrected upright document layout:
+
+- **consignor**: 
+    * Look for the large rectangular block labeled "CONSIGNOR:".
+    * Read the entire handwriting span within this region. Do not truncate.
+    * Capture the full name and address completely (e.g., "Pidilite Industries Ltd").
+
+- **consignee**: 
+    * Look for the large rectangular block labeled "CONSIGNEE:(SHIPPED TO)".
+    * Even if the text is written in large, looping handwriting that spans multiple lines or crowds the box borders, read the entire entry carefully.
+    * Capture the complete multi-line company name and address or destination entry.
+
 - **invoice_number**: 
-    * Look for the box labeled "INVOICE NO.". Extract the continuous sequence of numbers written there.
-    * The number may physically overflow past the right boundary line of its box; treat the overflowing digits as part of the same continuous number.
-    * CRITICAL: The true system invoice number must NEVER contain a forward slash ('/'). If you encounter a slash or a character that looks like a slash, interpret it as the number '1' and merge it seamlessly with the rest of the digits.
+    * Look for the box labeled "INVOICE NO.". 
+    * Extract the continuous sequence of numbers written there, treating any digits overflowing past the right boundary line as part of the same continuous number.
+    * CRITICAL: The final number must NEVER contain a forward slash ('/'). If you encounter a slash or a character that looks like a slash, interpret it as the number '1' and merge it seamlessly with the rest of the digits.
     * Ignore any neighboring alphabetical text (like the letter 'y' from the "FROM" box).
 
 - **invoice_value**:
-    * Look for the box explicitly labeled "INVOICE VALUE". 
-    * Extract the total monetary valuation of the goods listed in this box.
-    * If the document is handwritten, ignore trailing currency designators, formatting lines, or suffix dashes (such as "/-" or "—"). Extract only the core numerical amount.
-    * Convert the final value to a clean decimal string format (e.g., "8939.76" or "108336"). Do not include currency symbols (Rs, $).
+    * Look for the box explicitly labeled "INVOICE VALUE". Extract the total monetary value.
+    * Ignore trailing currency designators, formatting lines, or suffix dashes (such as "/-" or "—"). Extract only the core numerical amount.
+    * Convert the final value to a clean decimal string format (e.g., "108336"). Do not include currency symbols (Rs, $).
 
 - **date**: 
     * Look for the field explicitly labeled "DATE & TIME" or "BOOKING DATE & TIME". Extract only the date portion in a clean format (e.g., DD/MM/YY or DD-MMM-YYYY).
     * CRITICAL: Do NOT extract the "EXPECTED DELIVERY DATE". Always prioritize the actual booking/creation date.
 
-- **consignor**: 
-    * Extract the full company name and shipping address listed under the "CONSIGNOR" or "FROM" label. Clean up any trailing text or address details if they bleed across lines.
-
-- **consignee**: 
-    * Extract the full company name and shipping address listed under the "CONSIGNEE (SHIPPED TO)" or "TO" label.
-
 - **is_sealed**: 
-    * Scan the document for an official inked corporate/security stamp or verification seal (such as the purple "WELLSUN TEXCHEM PVT LTD" or "ACE REALTORS" stamps). 
+    * Scan the document for an official inked corporate/security stamp or verification seal (such as a round purple or blue stamp). 
     * Return `true` if a physical ink stamp is visible anywhere on the document, otherwise return `false`.
 
 - **document_type**:
@@ -46,7 +55,7 @@ Follow these strict visual processing rules to handle mixed handwriting, printin
     * Return the exact string "printed" if these core transactional fields are filled out via computer typography or machine text.
     * CRITICAL CLASSIFICATION RULE: Ignore the presence of handwritten text inside security or gate entry stamps at the bottom when making this decision. Focus strictly on the primary billing boxes.
 
-### 2. OUTPUT FORMAT CONSTRAINT:
+### STEP 3: OUTPUT FORMAT CONSTRAINT
 Return the output strictly as a valid JSON object. Do not include any conversational introductions, markdown code block wrappers (like ```json), or trailing explanations. Output the raw JSON text only.
 
 Expected JSON Schema:
